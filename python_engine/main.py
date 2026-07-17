@@ -440,6 +440,17 @@ def save_pdf(input_path, output_path):
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
+def create_blank_pdf(output_path):
+    """Create a new blank single-page PDF at the given path."""
+    try:
+        doc = fitz.open()
+        doc.new_page()
+        doc.save(output_path)
+        doc.close()
+        return {"status": "success", "message": f"Blank PDF created → {output_path}"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 # ─────────────────────────────────────────────────────────────
 # DISPATCH TABLE
 # ─────────────────────────────────────────────────────────────
@@ -507,6 +518,7 @@ if __name__ == "__main__":
         elif args.action == "get_metadata":  result = get_metadata(inp)
         elif args.action == "set_metadata":  result = set_metadata(inp, out, args.title, args.author, args.subject, args.keywords)
         elif args.action == "save":          result = save_pdf(inp, out)
+        elif args.action == "create_blank":  result = create_blank_pdf(out)
         elif args.action == "insert_blank":  result = insert_blank_page(inp, out, args.page)
         elif args.action == "insert_file":   result = insert_file(inp, out, args.image, args.page) # args.image reused for file path
         elif args.action == "duplicate_page":result = duplicate_page(inp, out, args.page)

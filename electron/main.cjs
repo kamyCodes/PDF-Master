@@ -135,7 +135,7 @@ ipcMain.handle('dialog:openOffice', async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
     properties: ['openFile'],
     defaultPath: app.getPath('documents'),
-    filters: [{ name: 'Office Documents', extensions: ['docx', 'doc', 'pptx', 'ppt'] }]
+    filters: [{ name: 'Office Documents', extensions: ['docx', 'doc', 'pptx', 'ppt', 'xlsx', 'xls'] }]
   });
   if (canceled || filePaths.length === 0) return null;
   return filePaths[0]; // Just return the single path
@@ -180,6 +180,10 @@ ipcMain.handle('file:copy', async (event, srcPath, destPath) => {
 
 // Get temp path in scratch folder
 ipcMain.handle('file:getTempPath', async (event, suffix) => {
+  // Always ensure scratch dir exists (in case it was cleaned or first run)
+  if (!fs.existsSync(scratchDir)) {
+    fs.mkdirSync(scratchDir, { recursive: true });
+  }
   const tempName = `temp_${Date.now()}_${suffix || 'output'}.pdf`;
   return path.join(scratchDir, tempName);
 });

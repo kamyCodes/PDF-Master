@@ -228,8 +228,8 @@ function App() {
       const savePath = await api.saveFile('blank.pdf');
       if (!savePath) return;
       showStatus('Creating blank document…');
-      const result = await api.runPython('save', ['--input', '', '--output', savePath]);
-      if (result.status === 'success' || result.message?.includes('NoneType')) {
+      const result = await api.runPython('create_blank', ['--output', savePath]);
+      if (result.status === 'success') {
         showStatus('✓ Blank document created.');
         const fileResult = await api.readFile(savePath);
         if (fileResult && !fileResult.error) {
@@ -284,16 +284,20 @@ function App() {
       return;
     }
 
-    if (actionName === 'convert-word' || actionName === 'convert-ppt') {
+    if (actionName === 'convert-word' || actionName === 'convert-ppt' || actionName === 'convert-excel') {
       const officePath = await api.openOffice();
       if (!officePath) return;
-      const parentDir = officePath.substring(0, officePath.lastIndexOf('\\'));
-      showStatus(`Converting Office document via LibreOffice…`);
-      const result = await api.runPython('convert_office', ['--input', officePath, '--output', parentDir]);
+      // Use a scratch temp path for output — LibreOffice will create the pdf in the same folder as --outdir
+      const outDir = await api.getTempPath('office_conversion');
+      // getTempPath returns a .pdf file name; we need the directory part
+      // We use the scratch directory itself as the outdir
+      const scratchOutDir = outDir.substring(0, outDir.lastIndexOf('\\'));
+      showStatus('Converting Office document via LibreOffice…');
+      const result = await api.runPython('convert_office', ['--input', officePath, '--output', scratchOutDir]);
       if (result.status === 'success' && result.output_path) {
         showStatus('✓ Converted successfully!');
         handleOpenSpecificFile(result.output_path);
-      } else showStatus(`Conversion failed: ${result.message}`, true);
+      } else showStatus(`Conversion failed: ${result.message || 'LibreOffice may not be installed.'}`, true);
       return;
     }
 
