@@ -7,24 +7,36 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   import.meta.url
 ).toString();
 
-const PDFViewer = ({ 
-  fileData, 
-  scale, 
-  setScale, 
-  currentPage, 
-  setCurrentPage, 
-  singlePageMode = false, 
+const PDFViewer = ({
+  fileData,
+  scale,
+  setScale,
+  currentPage,
+  setCurrentPage,
+  singlePageMode = false,
   darkMode = false,
-  onDocumentLoad
+  onDocumentLoad,
 }) => {
-  const containerRef = useRef(null);
-  const [pdfDoc, setPdfDoc] = useState(null);
-  const [numPages, setNumPages] = useState(0);
+  const containerRef  = useRef(null);
+  const stageRef      = useRef(null);      // scrollable stage ref
+  const [pdfDoc,    setPdfDoc]    = useState(null);
+  const [numPages,  setNumPages]  = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [error,     setError]     = useState(null);
+
+  // Render-task handles so we can cancel in-flight renders
   const renderTasksRef = useRef([]);
 
-  // Load from binary data — no file URL needed
+  // Previous-value refs — used to detect what actually changed
+  const prevCurrentPage    = useRef(currentPage);
+  const prevSinglePageMode = useRef(singlePageMode);
+  const prevPdfDoc         = useRef(pdfDoc);
+  const prevScale          = useRef(scale);
+  const prevDarkMode       = useRef(darkMode);
+
+  // ─────────────────────────────────────────────────────────────────
+  // 1.  Load PDF from binary buffer
+  // ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!fileData) {
       setPdfDoc(null);
@@ -37,8 +49,7 @@ const PDFViewer = ({
     setError(null);
     setPdfDoc(null);
 
-    const uint8 = new Uint8Array(fileData);
-    const loadingTask = pdfjsLib.getDocument({ data: uint8 });
+    const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(fileData) });
 
     loadingTask.promise
       .then((doc) => {
@@ -47,15 +58,10 @@ const PDFViewer = ({
         setNumPages(doc.numPages);
         setIsLoading(false);
         setCurrentPage(1);
-        
-        // Notify parent application of total pages
-        if (onDocumentLoad) {
-          onDocumentLoad(doc.numPages);
-        }
+        if (onDocumentLoad) onDocumentLoad(doc.numPages);
       })
       .catch((err) => {
         if (cancelled) return;
-        console.error('PDF load error:', err);
         setError(`Failed to load PDF: ${err.message}`);
         setIsLoading(false);
       });
@@ -66,87 +72,115 @@ const PDFViewer = ({
     };
   }, [fileData]);
 
-  // Render pages based on doc, scale, singlePageMode, and currentPage
+  // ─────────────────────────────────────────────────────────────────
+  // 2.  Render / scroll on state changes
+  //     KEY RULE:
+  //       • In CONTINUOUS mode, if only currentPage changed → SCROLL, don't re-render.
+  //       • Everything else → full re-render, then scroll to currentPage.
+  // ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!pdfDoc || !containerRef.current) return;
 
-    // Cancel any in-progress renders
+    const pageChanged    = prevCurrentPage.current    !== currentPage;
+    const modeChanged    = prevSinglePageMode.current !== singlePageMode;
+    const docChanged     = prevPdfDoc.current         !== pdfDoc;
+    const scaleChanged   = prevScale.current          !== scale;
+    const darkChanged    = prevDarkMode.current       !== darkMode;
+
+    // Update refs BEFORE any early return so next call has correct previous values
+    prevCurrentPage.current    = currentPage;
+    prevSinglePageMode.current = singlePageMode;
+    prevPdfDoc.current         = pdfDoc;
+    prevScale.current          = scale;
+    prevDarkMode.current       = darkMode;
+
+    // ── Continuous-mode navigation: just scroll ───────────────────
+    const onlyPageChangedContinuous =
+      !singlePageMode &&
+      !modeChanged && !docChanged && !scaleChanged && !darkChanged &&
+      pageChanged;
+
+    if (onlyPageChangedContinuous) {
+      scrollToPage(currentPage);
+      return;
+    }
+
+    // ── Full re-render ────────────────────────────────────────────
     renderTasksRef.current.forEach((t) => { try { t.cancel(); } catch (_) {} });
     renderTasksRef.current = [];
+    containerRef.current.innerHTML = '';
 
-    const container = containerRef.current;
-    container.innerHTML = '';
+    const startPage = singlePageMode ? currentPage : 1;
+    const endPage   = singlePageMode ? currentPage : pdfDoc.numPages;
 
-    const renderPages = async () => {
-      const startPage = singlePageMode ? currentPage : 1;
-      const endPage = singlePageMode ? currentPage : pdfDoc.numPages;
-
-      const actualStart = Math.max(1, Math.min(startPage, pdfDoc.numPages));
-      const actualEnd = Math.max(1, Math.min(endPage, pdfDoc.numPages));
-
-      for (let pageNum = actualStart; pageNum <= actualEnd; pageNum++) {
+    const doRender = async () => {
+      for (let pageNum = startPage; pageNum <= endPage; pageNum++) {
         try {
-          const page = await pdfDoc.getPage(pageNum);
+          const page     = await pdfDoc.getPage(pageNum);
           const viewport = page.getViewport({ scale });
 
           const wrapper = document.createElement('div');
-          wrapper.className = `pdf-page-wrapper ${darkMode ? 'pdf-dark' : ''}`;
+          wrapper.className = `pdf-page-wrapper${darkMode ? ' pdf-dark' : ''}`;
           wrapper.dataset.page = String(pageNum);
 
           const canvas = document.createElement('canvas');
+          canvas.width  = viewport.width;
           canvas.height = viewport.height;
-          canvas.width = viewport.width;
           canvas.className = 'pdf-canvas';
-          if (darkMode) {
-            canvas.style.filter = 'invert(0.9) hue-rotate(180deg)';
-          }
+          if (darkMode) canvas.style.filter = 'invert(0.9) hue-rotate(180deg)';
 
           const label = document.createElement('div');
-          label.className = 'pdf-page-label';
+          label.className   = 'pdf-page-label';
           label.textContent = `Page ${pageNum}`;
 
           wrapper.appendChild(canvas);
           wrapper.appendChild(label);
-          container.appendChild(wrapper);
+          containerRef.current.appendChild(wrapper);
 
-          const renderTask = page.render({
-            canvasContext: canvas.getContext('2d'),
-            viewport,
-          });
+          const renderTask = page.render({ canvasContext: canvas.getContext('2d'), viewport });
           renderTasksRef.current.push(renderTask);
-
           await renderTask.promise;
         } catch (e) {
-          if (e?.name !== 'RenderingCancelledException') {
-            console.error('Render error page ' + pageNum + ':', e);
-          }
+          if (e?.name !== 'RenderingCancelledException') console.error(e);
         }
+      }
+
+      // After a full re-render of continuous mode scroll to the desired page
+      if (!singlePageMode && currentPage > 1) {
+        // Give the browser one frame to layout the canvases before scrolling
+        requestAnimationFrame(() => scrollToPage(currentPage));
       }
     };
 
-    renderPages();
-  }, [pdfDoc, scale, singlePageMode, currentPage, darkMode]);
+    doRender();
+  }, [pdfDoc, scale, singlePageMode, darkMode, currentPage]);
 
-  // Track visible page in continuous mode (scrolling down updates active page count status)
+  // ─────────────────────────────────────────────────────────────────
+  // 3.  Track visible page while user scrolls (continuous mode only)
+  // ─────────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (singlePageMode || !containerRef.current || numPages === 0) return;
+    if (singlePageMode || !stageRef.current || numPages === 0) return;
 
-    const stage = containerRef.current.parentElement;
     const observer = new IntersectionObserver(
       (entries) => {
-        const topEntry = entries
+        const top = entries
           .filter((e) => e.isIntersecting)
           .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-        if (topEntry) {
-          setCurrentPage(parseInt(topEntry.target.dataset.page, 10));
+        if (top) {
+          const pg = parseInt(top.target.dataset.page, 10);
+          // Only update if we have a valid page and it actually changed
+          if (!isNaN(pg) && pg !== prevCurrentPage.current) {
+            setCurrentPage(pg);
+          }
         }
       },
-      { root: stage, threshold: 0.2 }
+      { root: stageRef.current, threshold: 0.3 }
     );
 
     const observe = () => {
-      const wrappers = containerRef.current?.querySelectorAll('.pdf-page-wrapper');
-      if (wrappers?.length > 0) wrappers.forEach((w) => observer.observe(w));
+      if (!containerRef.current) return;
+      const wrappers = containerRef.current.querySelectorAll('.pdf-page-wrapper');
+      if (wrappers.length > 0) wrappers.forEach((w) => observer.observe(w));
       else setTimeout(observe, 300);
     };
     observe();
@@ -154,75 +188,66 @@ const PDFViewer = ({
     return () => observer.disconnect();
   }, [numPages, scale, singlePageMode]);
 
-  // Scroll target page into view when currentPage changes from outside (e.g. sidebar thumbnails)
-  useEffect(() => {
-    if (singlePageMode || !containerRef.current || !pdfDoc) return;
-    const targetPageWrapper = containerRef.current.querySelector(`.pdf-page-wrapper[data-page="${currentPage}"]`);
-    if (targetPageWrapper) {
-      const rect = targetPageWrapper.getBoundingClientRect();
-      const parentRect = containerRef.current.parentElement.getBoundingClientRect();
-      
-      // Determine if target page is outside the visible stage window
-      const isOut = (rect.top < parentRect.top - 50 || rect.bottom > parentRect.bottom + 50);
-      if (isOut) {
-        targetPageWrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
+  // ─────────────────────────────────────────────────────────────────
+  // Helpers
+  // ─────────────────────────────────────────────────────────────────
+  const scrollToPage = (page) => {
+    if (!containerRef.current) return;
+    const wrapper = containerRef.current.querySelector(`.pdf-page-wrapper[data-page="${page}"]`);
+    if (wrapper) {
+      wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
-  }, [currentPage, singlePageMode, pdfDoc]);
+  };
 
-  const zoomIn = () => setScale((s) => Math.min(+(s + 0.15).toFixed(2), 3.0));
+  const zoomIn  = () => setScale((s) => Math.min(+(s + 0.15).toFixed(2), 3.0));
   const zoomOut = () => setScale((s) => Math.max(+(s - 0.15).toFixed(2), 0.5));
-  
-  const handlePrevPage = () => {
-    setCurrentPage((p) => Math.max(p - 1, 1));
-  };
 
-  const handleNextPage = () => {
-    setCurrentPage((p) => Math.min(p + 1, numPages));
-  };
+  const handlePrevPage = () => setCurrentPage((p) => Math.max(p - 1, 1));
+  const handleNextPage = () => setCurrentPage((p) => Math.min(p + 1, numPages));
 
+  // ─────────────────────────────────────────────────────────────────
+  // Render
+  // ─────────────────────────────────────────────────────────────────
   return (
-    <div className={`pdf-viewer-root ${darkMode ? 'viewer-dark' : ''}`}>
+    <div className={`pdf-viewer-root${darkMode ? ' viewer-dark' : ''}`}>
       {/* Controls Bar */}
       <div className="pdf-controls-bar">
         <div className="pdf-controls-left">
           {numPages > 0 && (
             <div className="page-navigator">
-              <button 
-                className="nav-arrow-btn" 
-                onClick={handlePrevPage} 
-                disabled={currentPage === 1}
+              <button
+                className="nav-arrow-btn"
+                onClick={handlePrevPage}
+                disabled={currentPage <= 1}
                 title="Previous Page"
-              >
-                ◀
-              </button>
+              >◀</button>
               <span className="pdf-page-count">
                 Page {currentPage} of {numPages}
               </span>
-              <button 
-                className="nav-arrow-btn" 
-                onClick={handleNextPage} 
-                disabled={currentPage === numPages}
+              <button
+                className="nav-arrow-btn"
+                onClick={handleNextPage}
+                disabled={currentPage >= numPages}
                 title="Next Page"
-              >
-                ▶
-              </button>
+              >▶</button>
             </div>
           )}
         </div>
+
         <div className="pdf-controls-center">
           <button className="ctrl-btn" onClick={zoomOut} title="Zoom Out">−</button>
           <span className="zoom-level">{Math.round(scale * 100)}%</span>
-          <button className="ctrl-btn" onClick={zoomIn} title="Zoom In">+</button>
+          <button className="ctrl-btn" onClick={zoomIn}  title="Zoom In">+</button>
           <div className="ctrl-divider" />
           <button className="ctrl-btn text-btn" onClick={() => setScale(1.4)} title="Fit to Width">Width</button>
           <button className="ctrl-btn text-btn" onClick={() => setScale(1.0)} title="Fit to Page">Page</button>
         </div>
+
         <div className="pdf-controls-right" />
       </div>
 
       {/* PDF Stage */}
-      <div className="pdf-stage">
+      <div className="pdf-stage" ref={stageRef}>
         {isLoading && (
           <div className="pdf-state-msg">
             <div className="spinner" />
