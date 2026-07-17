@@ -1,0 +1,78 @@
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+}
+
+.main-stage {
+  flex: 1;
+  background-color: #1a1a1c;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  position: relative;
+  overflow: auto;
+}
+
+.pdf-viewer-placeholder {
+  width: 100%;
+  max-width: 800px;
+  height: 100%;
+  border: 2px dashed rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.placeholder-content {
+  text-align: center;
+  color: #707075;
+}
+
+.placeholder-content .icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+  display: block;
+  opacity: 0.5;
+}
+
+.placeholder-content h2 {
+  margin: 0 0 8px 0;
+  font-weight: 500;
+  color: #a0a0a5;
+}
+
+.placeholder-content p {
+  margin: 0;
+  font-size: 14px;
+}
+
+/* ── Status Bar ─────────────────────────────────── */
+.status-bar {
+  flex-shrink: 0;
+  padding: 7px 20px;
+  font-size: 13px;
+  font-weight: 500;
+  animation: slideDown 0.2s ease;
+}
+
+.status-bar.success {
+  background: rgba(0, 200, 100, 0.12);
+  border-bottom: 1px solid rgba(0, 200, 100, 0.25);
+  color: #4ecca0;
+}
+
+.status-bar.error {
+  background: rgba(255, 80, 80, 0.12);
+  border-bottom: 1px solid rgba(255, 80, 80, 0.25);
+  color: #ff7070;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

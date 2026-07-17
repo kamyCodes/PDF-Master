@@ -1,0 +1,185 @@
+/* ── Root Layout ─────────────────────────────────────────────── */
+.pdf-viewer-root {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background: #1a1a1e;
+  font-family: 'Inter', sans-serif;
+}
+
+/* ── Controls Bar ─────────────────────────────────────────────── */
+.pdf-controls-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: rgba(30, 30, 35, 0.95);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  flex-shrink: 0;
+  height: 48px;
+}
+
+.pdf-controls-left,
+.pdf-controls-right {
+  width: 160px;
+}
+
+.pdf-controls-center {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pdf-page-count {
+  font-size: 13px;
+  color: #a0a0a8;
+}
+
+.ctrl-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #e8e8f0;
+  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ctrl-btn.text-btn {
+  width: auto;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+}
+
+.ctrl-btn:hover {
+  background: rgba(255,255,255,0.14);
+  border-color: rgba(255,255,255,0.2);
+  transform: translateY(-1px);
+}
+
+.ctrl-btn:active {
+  transform: translateY(0);
+}
+
+.zoom-level {
+  font-size: 13px;
+  color: #c0c0cc;
+  min-width: 44px;
+  text-align: center;
+}
+
+.ctrl-divider {
+  width: 1px;
+  height: 22px;
+  background: rgba(255,255,255,0.1);
+  margin: 0 4px;
+}
+
+/* ── PDF Stage ─────────────────────────────────────────────────── */
+.pdf-stage {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 16px;
+  background: #18181c;
+  position: relative;
+}
+
+/* ── Pages Container ───────────────────────────────────────────── */
+.pdf-pages-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+}
+
+/* ── Page Wrapper & Canvas ─────────────────────────────────────── */
+.pdf-page-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  filter: drop-shadow(0 6px 24px rgba(0, 0, 0, 0.6));
+  transition: transform 0.2s ease;
+}
+
+.pdf-canvas {
+  display: block;
+  background-color: #ffffff;
+  max-width: 100%;
+  height: auto;
+}
+
+.pdf-page-label {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #606068;
+  letter-spacing: 0.4px;
+}
+
+/* ── State Messages (Loading / Error) ───────────────────────────── */
+.pdf-state-msg {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  color: #707078;
+  padding: 48px;
+  text-align: center;
+}
+
+.pdf-state-msg p {
+  margin: 0;
+  font-size: 15px;
+}
+
+.pdf-state-msg.error {
+  color: #e07070;
+}
+
+.pdf-state-msg .big-icon {
+  font-size: 52px;
+  opacity: 0.4;
+}
+
+/* ── Spinner ────────────────────────────────────────────────────── */
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top-color: #0078d4;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Scrollbar ──────────────────────────────────────────────────── */
+.pdf-stage::-webkit-scrollbar {
+  width: 8px;
+}
+.pdf-stage::-webkit-scrollbar-track {
+  background: rgba(255,255,255,0.03);
+}
+.pdf-stage::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.15);
+  border-radius: 4px;
+}
+.pdf-stage::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.25);
+}
