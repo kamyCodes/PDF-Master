@@ -14,14 +14,19 @@ def split_pdf(input_path, output_dir):
         doc = fitz.open(input_path)
         num_pages = len(doc)
         base = os.path.splitext(os.path.basename(input_path))[0]
+        
+        # Create a new subfolder named after the PDF file
+        pdf_folder = os.path.join(output_dir, base)
+        os.makedirs(pdf_folder, exist_ok=True)
+        
         for i in range(num_pages):
             out_doc = fitz.open()
             out_doc.insert_pdf(doc, from_page=i, to_page=i)
-            out_path = os.path.join(output_dir, f"{base}_page_{i+1}.pdf")
+            out_path = os.path.join(pdf_folder, f"{base}_page_{i+1}.pdf")
             out_doc.save(out_path)
             out_doc.close()
         doc.close()
-        return {"status": "success", "message": f"Split into {num_pages} pages in: {output_dir}"}
+        return {"status": "success", "message": f"Split into {num_pages} pages in folder: {pdf_folder}"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
