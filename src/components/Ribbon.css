@@ -1,34 +1,36 @@
 .ribbon-container {
   display: flex;
   flex-direction: column;
-  background: rgba(30, 30, 35, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(18, 18, 20, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   color: #fff;
   font-family: 'Inter', sans-serif;
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
   z-index: 100;
-  -webkit-app-region: drag; /* Allows dragging the window by the ribbon */
+  -webkit-app-region: drag;
 }
 
 .ribbon-tabs {
   display: flex;
   padding: 8px 16px 0;
-  gap: 4px;
+  gap: 2px;
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
 }
 
 .ribbon-tab {
   background: transparent;
   border: none;
-  color: #a0a0a5;
-  padding: 8px 16px;
-  font-size: 13px;
+  color: #8b8b92;
+  padding: 6px 14px;
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   border-top-left-radius: 6px;
   border-top-right-radius: 6px;
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   -webkit-app-region: no-drag;
 }
 
@@ -38,32 +40,45 @@
 }
 
 .ribbon-tab.active {
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
-  border-bottom: 2px solid #0078d4; /* A vibrant accent color */
+  background: rgba(255, 255, 255, 0.08);
+  color: #4ecca0;
+  font-weight: 600;
+  border-bottom: 2px solid #4ecca0;
 }
 
 .ribbon-content {
   display: flex;
-  padding: 12px 16px;
-  min-height: 90px;
-  gap: 24px;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.01);
+  min-height: 98px;
+}
+
+.ribbon-tab-pane {
+  display: flex;
+  padding: 10px 16px;
+  gap: 16px;
+  width: 100%;
+  animation: fadeInTab 0.15s ease-out;
+}
+
+@keyframes fadeInTab {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .ribbon-group {
   display: flex;
   flex-direction: row;
-  align-items: flex-start;
-  gap: 8px;
+  align-items: center;
+  gap: 6px;
   position: relative;
-  padding-bottom: 24px;
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
-  padding-right: 24px;
+  padding-bottom: 20px;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  padding-right: 16px;
 }
 
 .ribbon-group:last-child {
   border-right: none;
+  padding-right: 0;
 }
 
 .ribbon-action-btn {
@@ -73,41 +88,166 @@
   justify-content: center;
   background: transparent;
   border: 1px solid transparent;
-  color: #e0e0e0;
-  padding: 8px 12px;
+  color: #cfcfd4;
+  padding: 6px 10px;
   border-radius: 6px;
   cursor: pointer;
-  font-size: 12px;
-  gap: 6px;
-  transition: all 0.2s ease;
+  font-size: 11px;
+  gap: 4px;
+  min-width: 68px;
+  height: 58px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   -webkit-app-region: no-drag;
 }
 
-.ribbon-action-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+.ribbon-action-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
-.ribbon-action-btn:active {
+.ribbon-action-btn:active:not(:disabled) {
   transform: translateY(0);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.ribbon-action-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.ribbon-action-btn.primary {
+  background: rgba(78, 204, 160, 0.08);
+  border: 1px solid rgba(78, 204, 160, 0.2);
+  color: #4ecca0;
+}
+
+.ribbon-action-btn.primary:hover {
+  background: rgba(78, 204, 160, 0.15);
+  border: 1px solid rgba(78, 204, 160, 0.3);
+}
+
+.ribbon-action-btn.ai-btn {
+  border: 1px solid rgba(138, 43, 226, 0.25);
+  background: rgba(138, 43, 226, 0.05);
+}
+
+.ribbon-action-btn.ai-btn:hover:not(:disabled) {
+  background: rgba(138, 43, 226, 0.15);
+  border: 1px solid rgba(138, 43, 226, 0.4);
+  box-shadow: 0 0 12px rgba(138, 43, 226, 0.25);
 }
 
 .ribbon-action-btn .icon {
-  font-size: 24px;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+  font-size: 20px;
+  line-height: 1;
 }
 
 .group-label {
   position: absolute;
   bottom: 0;
   left: 0;
-  right: 0;
+  right: 16px;
   text-align: center;
-  font-size: 11px;
-  color: #707075;
+  font-size: 9px;
+  font-weight: 600;
+  color: #5d5d62;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  padding-bottom: 4px;
+  letter-spacing: 0.8px;
+  padding-bottom: 2px;
+  pointer-events: none;
+}
+
+.ribbon-group:last-child .group-label {
+  right: 0;
+}
+
+/* Dropdown styling */
+.dropdown-container {
+  position: relative;
+  display: inline-block;
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: 102%;
+  left: 0;
+  background: #1c1c1f;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  min-width: 150px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  z-index: 200;
+  padding: 4px 0;
+  animation: dropdownFade 0.15s ease-out;
+  -webkit-app-region: no-drag;
+}
+
+@keyframes dropdownFade {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.dropdown-menu button {
+  width: 100%;
+  padding: 8px 14px;
+  background: transparent;
+  border: none;
+  color: #ddd;
+  text-align: left;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.dropdown-menu button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+/* Font group styling */
+.font-group {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-width: 140px;
+  -webkit-app-region: no-drag;
+}
+
+.ribbon-select {
+  background: #18181b;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #ddd;
+  border-radius: 4px;
+  font-size: 11px;
+  padding: 3px 6px;
+  outline: none;
+  cursor: pointer;
+  transition: border 0.15s;
+}
+
+.ribbon-select:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.ribbon-select:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.ribbon-color {
+  width: 100%;
+  height: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+.ribbon-color:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }

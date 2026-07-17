@@ -169,6 +169,43 @@
   to { transform: rotate(360deg); }
 }
 
+/* ── Page Navigator ────────────────────────────────────────────── */
+.page-navigator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 4px 10px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.nav-arrow-btn {
+  background: transparent;
+  border: none;
+  color: #a0a0a8;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 4px 6px;
+  border-radius: 50%;
+  transition: all 0.15s;
+}
+
+.nav-arrow-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.nav-arrow-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* ── Dark Mode Wrapper Glow ────────────────────────────────────── */
+.pdf-page-wrapper.pdf-dark {
+  filter: drop-shadow(0 6px 24px rgba(0, 200, 150, 0.08)) drop-shadow(0 4px 16px rgba(0,0,0,0.8));
+}
+
 /* ── Scrollbar ──────────────────────────────────────────────────── */
 .pdf-stage::-webkit-scrollbar {
   width: 8px;
