@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import Ribbon from './components/Ribbon';
 import PDFViewer from './components/PDFViewer';
 import './App.css';
@@ -9,23 +9,7 @@ function App() {
 
   const showStatus = (msg, isError = false) => {
     setStatusMsg({ text: msg, error: isError });
-    setTimeout(() => setStatusMsg(''), 4000);
-  };
-
-  // Reload the current file from disk (after editing)
-  const reloadFile = async (filePath) => {
-    const result = await window.electronAPI.openFile.__bypass?.(filePath)
-      ?? await reloadFromPath(filePath);
-    return result;
-  };
-
-  // Read updated file bytes from path via main process
-  const reloadFromPath = async (filePath) => {
-    // We re-use runPython with a no-op, or we add a read handler.
-    // Simplest: use save action to copy to a temp path, read it back.
-    // Actually we can call openFile but we need to set path. 
-    // For now just alert — in a future iteration we add a read:file IPC.
-    return null;
+    setTimeout(() => setStatusMsg(''), 5000);
   };
 
   const handleOpenFile = async () => {
@@ -57,7 +41,14 @@ function App() {
       const args = ['--input', ...paths, '--output', savePath];
       const result = await api.runPython('merge', args);
       if (result.status === 'success') {
-        showStatus('Merged! Saved to: ' + savePath.split('\\').pop());
+        showStatus('✓ Merged! Saved to: ' + savePath.split('\\').pop());
+        // Load the merged file immediately in the viewer
+        const loaded = await api.readFile(savePath);
+        if (loaded && !loaded.error) {
+          setCurrentFile(loaded);
+        } else if (loaded?.error) {
+          showStatus('Failed to load merged file: ' + loaded.error, true);
+        }
       } else {
         showStatus('Merge error: ' + result.message, true);
       }
@@ -84,7 +75,7 @@ function App() {
       }
 
     } else if (actionName === 'highlight') {
-      const text = prompt('Enter the text to highlight:');
+      const text = prompt('Enter the exact text to highlight (case-sensitive):');
       if (!text) return;
       const savePath = await api.saveFile(`${fileBaseName}_highlighted.pdf`);
       if (!savePath) return;
@@ -92,12 +83,19 @@ function App() {
       const result = await api.runPython('highlight', ['--input', filePath, '--output', savePath, '--text', text]);
       if (result.status === 'success') {
         showStatus('✓ Highlighted and saved to: ' + savePath.split('\\').pop());
+        // Load the highlighted file immediately in the viewer
+        const loaded = await api.readFile(savePath);
+        if (loaded && !loaded.error) {
+          setCurrentFile(loaded);
+        } else if (loaded?.error) {
+          showStatus('Failed to load highlighted file: ' + loaded.error, true);
+        }
       } else {
         showStatus('Highlight error: ' + result.message, true);
       }
 
     } else if (actionName === 'replace') {
-      const oldText = prompt('Text to find:');
+      const oldText = prompt('Exact text to find (case-sensitive):');
       if (!oldText) return;
       const newText = prompt('Replace with:');
       if (newText === null) return;
@@ -107,12 +105,18 @@ function App() {
       const result = await api.runPython('replace', ['--input', filePath, '--output', savePath, '--text', oldText, '--new_text', newText]);
       if (result.status === 'success') {
         showStatus('✓ ' + result.message);
+        // Load the edited file immediately in the viewer
+        const loaded = await api.readFile(savePath);
+        if (loaded && !loaded.error) {
+          setCurrentFile(loaded);
+        } else if (loaded?.error) {
+          showStatus('Failed to load edited file: ' + loaded.error, true);
+        }
       } else {
         showStatus('Replace error: ' + result.message, true);
       }
 
     } else if (actionName === 'save') {
-      // Overwrite the original file
       showStatus('Saving…');
       const result = await api.runPython('save', ['--input', filePath, '--output', filePath]);
       if (result.status === 'success') {
@@ -127,6 +131,11 @@ function App() {
       const result = await api.runPython('save', ['--input', filePath, '--output', savePath]);
       if (result.status === 'success') {
         showStatus('✓ Saved as: ' + savePath.split('\\').pop());
+        // Switch to the newly saved-as file
+        const loaded = await api.readFile(savePath);
+        if (loaded && !loaded.error) {
+          setCurrentFile(loaded);
+        }
       } else {
         showStatus('Save As error: ' + result.message, true);
       }

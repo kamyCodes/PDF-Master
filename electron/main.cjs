@@ -101,6 +101,17 @@ ipcMain.handle('dialog:saveFile', async (event, defaultName) => {
   return filePath;
 });
 
+// Read file directly (e.g. after edit or merge to update view)
+ipcMain.handle('file:read', async (event, filePath) => {
+  try {
+    const data = fs.readFileSync(filePath);
+    return { path: filePath, data: Array.from(data) };
+  } catch (err) {
+    console.error('Error reading PDF file directly:', err);
+    return { path: filePath, data: null, error: err.message };
+  }
+});
+
 // Generic handler for python backend commands
 ipcMain.handle('python:run', async (event, action, args) => {
   return new Promise((resolve, reject) => {
