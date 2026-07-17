@@ -6,6 +6,12 @@ import './App.css';
 // Import logo asset
 import logoImg from './assets/logo.png';
 
+// Custom Modals & Toasts
+import { useToast } from './hooks/useToast';
+import { useDialog } from './hooks/useDialog';
+import { ToastContainer } from './components/Toast';
+import { Dialog } from './components/Dialog';
+
 function App() {
   // Tabs State (supports multiple files open at once)
   const [openFiles, setOpenFiles] = useState([]); // { id, name, path, workingPath, data, currentPage, scale, numPages }
@@ -26,7 +32,9 @@ function App() {
   // Modals & Forms State
   const [activeModal, setActiveModal] = useState(null); // 'encrypt' | 'remove-pw' | 'watermark' | 'compress' | 'page-numbers' | 'header-footer' | 'metadata' | 'shortcuts'
   const [modalInputs, setModalInputs] = useState({});
-  const [statusMsg, setStatusMsg] = useState('');
+  
+  const { toasts, dismiss, success, error: toastError, info, loading } = useToast();
+  const { dialogState, prompt, confirm, alert } = useDialog();
 
   // Global Viewing Mode overrides
   const [singlePageMode, setSinglePageMode] = useState(false);
@@ -37,8 +45,9 @@ function App() {
 
   // Toast status bar helper
   const showStatus = (msg, isError = false) => {
-    setStatusMsg({ text: msg, error: isError });
-    setTimeout(() => setStatusMsg(''), 5000);
+    if (isError) toastError('Error', msg);
+    else if (msg.includes('…')) info('Working', msg);
+    else success('Success', msg);
   };
 
   // Keyboard shortcut listener
@@ -265,7 +274,7 @@ function App() {
 
     // Highlight Text
     else if (actionName === 'highlight') {
-      const text = prompt('Enter exact text to highlight (case-sensitive):');
+      const text = await prompt('Highlight Text', 'Enter exact text to highlight (case-sensitive):');
       if (!text) return;
       showStatus('Highlighting text…');
       const tempOut = await api.getTempPath('highlight');
@@ -281,9 +290,9 @@ function App() {
 
     // Replace Text
     else if (actionName === 'replace') {
-      const oldText = prompt('Exact text to find (case-sensitive):');
+      const oldText = await prompt('Find Text', 'Exact text to find (case-sensitive):');
       if (!oldText) return;
-      const newText = prompt('Replace with:');
+      const newText = await prompt('Replace Text', 'Replace with:');
       if (newText === null) return;
       showStatus('Replacing text…');
       const tempOut = await api.getTempPath('replace');
@@ -304,7 +313,7 @@ function App() {
 
     // Add Text
     else if (actionName === 'add-text') {
-      const text = prompt('Enter text to add:');
+      const text = await prompt('Add Text', 'Enter text to add:');
       if (!text) return;
       showStatus('Adding text overlay…');
       const tempOut = await api.getTempPath('addtext');
@@ -328,7 +337,7 @@ function App() {
 
     // Delete Text
     else if (actionName === 'delete-text') {
-      const text = prompt('Enter exact text to redact/delete:');
+      const text = await prompt('Delete Text', 'Enter exact text to redact/delete:');
       if (!text) return;
       showStatus('Deleting text…');
       const tempOut = await api.getTempPath('deltext');
@@ -348,7 +357,7 @@ function App() {
 
     // Underline & Strikethrough
     else if (actionName === 'underline' || actionName === 'strikethrough') {
-      const text = prompt(`Enter exact text to ${actionName}:`);
+      const text = await prompt('Format Text', `Enter exact text to ${actionName}:`);
       if (!text) return;
       showStatus(`${actionName.charAt(0).toUpperCase() + actionName.slice(1)}ing text…`);
       const tempOut = await api.getTempPath(actionName);
@@ -368,7 +377,7 @@ function App() {
 
     // Sticky Note
     else if (actionName === 'sticky-note') {
-      const note = prompt('Enter note text:');
+      const note = await prompt('Sticky Note', 'Enter note text:');
       if (!note) return;
       const tempOut = await api.getTempPath('note');
       const result = await api.runPython('sticky_note', [
@@ -389,7 +398,7 @@ function App() {
 
     // Add Image
     else if (actionName === 'add-image') {
-      const imgPath = prompt('Enter absolute path to local image (PNG/JPEG):');
+      const imgPath = await prompt('Embed Image', 'Enter absolute path to local image (PNG/JPEG):');
       if (!imgPath) return;
       showStatus('Embedding image…');
       const tempOut = await api.getTempPath('image');
@@ -430,8 +439,8 @@ function App() {
 
     // Delete Pages
     else if (actionName === 'delete-page') {
-      const confirm = window.confirm(`Are you sure you want to delete the current page (${activeFile.currentPage})?`);
-      if (!confirm) return;
+      const isConfirmed = await confirm('Delete Page', `Are you sure you want to delete the current page (${activeFile.currentPage})?`);
+      if (!isConfirmed) return;
       showStatus('Deleting page…');
       const tempOut = await api.getTempPath('delpage');
       const result = await api.runPython('delete_pages', [
@@ -866,12 +875,9 @@ function App() {
         )}
       </div>
 
-      {/* 4. Global bottom status bar */}
-      {statusMsg && (
-        <div className={`status-bar ${statusMsg.error ? 'error' : 'success'}`}>
-          {statusMsg.text}
-        </div>
-      )}
+      {/* 4. Global Toasts & Dialogs */}
+      <ToastContainer toasts={toasts} onDismiss={dismiss} />
+      <Dialog state={dialogState} />
 
       {/* 5. Modals Overlays */}
       {activeModal && (
