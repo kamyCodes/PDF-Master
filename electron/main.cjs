@@ -119,6 +119,28 @@ ipcMain.handle('dialog:openFiles', async () => {
   return filePaths;
 });
 
+// Open Images (for conversion)
+ipcMain.handle('dialog:openImages', async () => {
+  const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openFile', 'multiSelections'],
+    defaultPath: app.getPath('pictures'),
+    filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'bmp', 'tiff', 'gif'] }]
+  });
+  if (canceled || filePaths.length === 0) return null;
+  return filePaths;
+});
+
+// Open Office Document (for conversion)
+ipcMain.handle('dialog:openOffice', async () => {
+  const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openFile'],
+    defaultPath: app.getPath('documents'),
+    filters: [{ name: 'Office Documents', extensions: ['docx', 'doc', 'pptx', 'ppt'] }]
+  });
+  if (canceled || filePaths.length === 0) return null;
+  return filePaths[0]; // Just return the single path
+});
+
 // Save As dialog
 ipcMain.handle('dialog:saveFile', async (event, defaultName) => {
   const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
@@ -160,6 +182,43 @@ ipcMain.handle('file:copy', async (event, srcPath, destPath) => {
 ipcMain.handle('file:getTempPath', async (event, suffix) => {
   const tempName = `temp_${Date.now()}_${suffix || 'output'}.pdf`;
   return path.join(scratchDir, tempName);
+});
+
+// Get system printers
+ipcMain.handle('os:getPrinters', async () => {
+  if (!mainWindow) return [];
+  try {
+    return await mainWindow.webContents.getPrintersAsync();
+  } catch (err) {
+    console.error('Error fetching printers:', err);
+    return [];
+  }
+});
+
+// Silent print
+ipcMain.handle('os:printSilent', async (event, filePath, printSettings) => {
+  return new Promise((resolve) => {
+    // Create a hidden browser window specifically for printing the PDF
+    let printWin = new BrowserWindow({ show: false });
+    
+    printWin.webContents.on('did-finish-load', () => {
+      printWin.webContents.print({
+        silent: true,
+        deviceName: printSettings.deviceName,
+        copies: printSettings.copies || 1,
+        color: printSettings.color ?? true,
+        margins: { marginType: 'printableArea' },
+        landscape: printSettings.landscape || false
+      }, (success, errorType) => {
+        if (!success) console.error('Print failed:', errorType);
+        printWin.close();
+        resolve({ status: success ? 'success' : 'error', message: errorType });
+      });
+    });
+
+    // Load the local PDF file directly into the hidden window
+    printWin.loadFile(filePath);
+  });
 });
 
 // Generic handler for python backend commands

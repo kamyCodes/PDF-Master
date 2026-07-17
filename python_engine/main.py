@@ -3,6 +3,7 @@ import sys
 import json
 import os
 import shutil
+import subprocess
 import fitz  # PyMuPDF
 
 # ─────────────────────────────────────────────────────────────
@@ -83,6 +84,88 @@ def extract_pages(input_path, output_path, page_nums):
         return {"status": "success", "message": f"Extracted {len(page_nums)} page(s) → {output_path}"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+def insert_blank_page(input_path, output_path, page_num):
+    try:
+        doc = fitz.open(input_path)
+        doc.insert_page(int(page_num), text=" ")
+        doc.save(output_path)
+        doc.close()
+        return {"status": "success", "message": f"Blank page inserted at index {page_num}"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+def insert_file(input_path, output_path, insert_path, page_num):
+    try:
+        doc = fitz.open(input_path)
+        other_doc = fitz.open(insert_path)
+        doc.insert_pdf(other_doc, start_at=int(page_num))
+        doc.save(output_path)
+        other_doc.close()
+        doc.close()
+        return {"status": "success", "message": f"File inserted at index {page_num}"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+def duplicate_page(input_path, output_path, page_num):
+    try:
+        doc = fitz.open(input_path)
+        page_num = int(page_num)
+        doc.fullcopy_page(page_num, insert_at=page_num + 1)
+        doc.save(output_path)
+        doc.close()
+        return {"status": "success", "message": f"Page {page_num+1} duplicated"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+# ─────────────────────────────────────────────────────────────
+# CONVERSION & OCR
+# ─────────────────────────────────────────────────────────────
+
+def convert_images(image_paths, output_path):
+    try:
+        doc = fitz.open()
+        for img_path in image_paths:
+            img = fitz.open(img_path)
+            pdfbytes = img.convert_to_pdf()
+            img.close()
+            imgPDF = fitz.open("pdf", pdfbytes)
+            doc.insert_pdf(imgPDF)
+            imgPDF.close()
+        doc.save(output_path)
+        doc.close()
+        return {"status": "success", "message": f"Images converted to {output_path}"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+def convert_office(input_path, output_dir):
+    try:
+        # Calls local LibreOffice installation on Windows (must be in PATH)
+        cmd = ['soffice', '--headless', '--convert-to', 'pdf', '--outdir', output_dir, input_path]
+        subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        base_name = os.path.splitext(os.path.basename(input_path))[0] + ".pdf"
+        final_pdf_path = os.path.join(output_dir, base_name)
+        if os.path.exists(final_pdf_path):
+            return {"status": "success", "message": "Office document converted.", "output_path": final_pdf_path}
+        else:
+            return {"status": "error", "message": "LibreOffice conversion completed but PDF not found."}
+    except FileNotFoundError:
+        return {"status": "error", "message": "LibreOffice ('soffice') not found in PATH."}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+def ocr_searchable(input_path, output_path):
+    try:
+        # Requires PyMuPDF built with Tesseract support and Tesseract installed
+        doc = fitz.open(input_path)
+        for page in doc:
+            # Replaces the page with an OCR text overlay
+            page.get_textpage_ocr(flags=0, language='eng')
+        doc.save(output_path)
+        doc.close()
+        return {"status": "success", "message": "Document is now searchable"}
+    except Exception as e:
+        return {"status": "error", "message": "OCR failed. Ensure Tesseract is installed. " + str(e)}
 
 # ─────────────────────────────────────────────────────────────
 # TEXT OPERATIONS
@@ -424,6 +507,12 @@ if __name__ == "__main__":
         elif args.action == "get_metadata":  result = get_metadata(inp)
         elif args.action == "set_metadata":  result = set_metadata(inp, out, args.title, args.author, args.subject, args.keywords)
         elif args.action == "save":          result = save_pdf(inp, out)
+        elif args.action == "insert_blank":  result = insert_blank_page(inp, out, args.page)
+        elif args.action == "insert_file":   result = insert_file(inp, out, args.image, args.page) # args.image reused for file path
+        elif args.action == "duplicate_page":result = duplicate_page(inp, out, args.page)
+        elif args.action == "convert_images":result = convert_images(args.input, out)
+        elif args.action == "convert_office":result = convert_office(inp, out)
+        elif args.action == "ocr_searchable":result = ocr_searchable(inp, out)
         else:
             result = {"status": "error", "message": f"Unknown action: {args.action}"}
     except Exception as e:

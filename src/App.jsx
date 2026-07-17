@@ -11,6 +11,8 @@ import { useToast } from './hooks/useToast';
 import { useDialog } from './hooks/useDialog';
 import { ToastContainer } from './components/Toast';
 import { Dialog } from './components/Dialog';
+import { PrintModal } from './components/PrintModal';
+import { RecentFilesModal } from './components/RecentFilesModal';
 
 function App() {
   // Tabs State (supports multiple files open at once)
@@ -39,6 +41,34 @@ function App() {
   // Global Viewing Mode overrides
   const [singlePageMode, setSinglePageMode] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
+
+  // New Features State
+  const [showPrintModal, setShowPrintModal] = useState(false);
+  const [showRecentModal, setShowRecentModal] = useState(false);
+  const [recentFiles, setRecentFiles] = useState(() => {
+    try {
+      const saved = localStorage.getItem('recentFiles');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+  const [autoSave, setAutoSave] = useState(() => {
+    return localStorage.getItem('autoSave') === 'true';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('recentFiles', JSON.stringify(recentFiles));
+  }, [recentFiles]);
+
+  useEffect(() => {
+    localStorage.setItem('autoSave', autoSave.toString());
+  }, [autoSave]);
+
+  const addToRecent = (fileObj) => {
+    setRecentFiles(prev => {
+      const filtered = prev.filter(f => f.path !== fileObj.path);
+      return [{ name: fileObj.name, path: fileObj.path }, ...filtered].slice(0, 10);
+    });
+  };
 
   // Active File Getter helper
   const activeFile = openFiles.find((f) => f.id === activeFileId);
@@ -88,9 +118,38 @@ function App() {
       };
       setOpenFiles((prev) => [...prev, newFile]);
       setActiveFileId(newFile.id);
+      addToRecent({ name: fileName, path: result.path });
       showStatus(`Opened: ${fileName}`);
     } else if (result?.error) {
       showStatus(`Error loading PDF: ${result.error}`, true);
+    }
+  };
+
+  const handleOpenSpecificFile = async (filePath) => {
+    if (!window.electronAPI) return;
+    showStatus('Opening document…');
+    const result = await window.electronAPI.readFile(filePath);
+    if (result && !result.error) {
+      const fileName = filePath.split(/[/\\]/).pop();
+      const tempPath = await window.electronAPI.getTempPath('recent');
+      await window.electronAPI.copyFile(filePath, tempPath);
+      
+      const newFile = {
+        id: `file_${Date.now()}`,
+        name: fileName,
+        path: filePath,
+        workingPath: tempPath,
+        data: result.data,
+        currentPage: 1,
+        scale: 1.3,
+        numPages: 0
+      };
+      setOpenFiles((prev) => [...prev, newFile]);
+      setActiveFileId(newFile.id);
+      addToRecent({ name: fileName, path: filePath });
+      showStatus(`Opened: ${fileName}`);
+    } else {
+      showStatus(`Could not open file: ${result?.error || 'Unknown Error'}`, true);
     }
   };
 
@@ -200,6 +259,44 @@ function App() {
       return;
     }
 
+    if (actionName === 'settings-recent') {
+      setShowRecentModal(true);
+      return;
+    }
+
+    if (actionName === 'settings-autosave') {
+      setAutoSave(!autoSave);
+      showStatus(`Auto-save is now ${!autoSave ? 'ON' : 'OFF'}`);
+      return;
+    }
+
+    if (actionName === 'convert-images') {
+      const paths = await api.openImages();
+      if (!paths || paths.length === 0) return;
+      const savePath = await api.saveFile('images_converted.pdf');
+      if (!savePath) return;
+      showStatus('Converting images to PDF…');
+      const result = await api.runPython('convert_images', ['--input', ...paths, '--output', savePath]);
+      if (result.status === 'success') {
+        showStatus('✓ Images converted successfully!');
+        handleOpenSpecificFile(savePath);
+      } else showStatus(`Conversion failed: ${result.message}`, true);
+      return;
+    }
+
+    if (actionName === 'convert-word' || actionName === 'convert-ppt') {
+      const officePath = await api.openOffice();
+      if (!officePath) return;
+      const parentDir = officePath.substring(0, officePath.lastIndexOf('\\'));
+      showStatus(`Converting Office document via LibreOffice…`);
+      const result = await api.runPython('convert_office', ['--input', officePath, '--output', parentDir]);
+      if (result.status === 'success' && result.output_path) {
+        showStatus('✓ Converted successfully!');
+        handleOpenSpecificFile(result.output_path);
+      } else showStatus(`Conversion failed: ${result.message}`, true);
+      return;
+    }
+
     // ─────────────────────────────────────────────────────────────
     // DOCUMENT OPERATIONS (Requires active file)
     // ─────────────────────────────────────────────────────────────
@@ -252,8 +349,62 @@ function App() {
 
     // Print
     else if (actionName === 'print') {
-      showStatus('Opening printer spooler…');
-      setTimeout(() => showStatus('Sent to printer.'), 1500);
+      setShowPrintModal(true);
+      return;
+    }
+
+    // Insert Blank Page
+    else if (actionName === 'insert-blank') {
+      showStatus('Inserting blank page…');
+      const tempOut = await api.getTempPath('insert');
+      const result = await api.runPython('insert_blank', ['--input', workingPath, '--output', tempOut, '--page', String(activeFile.currentPage)]);
+      if (result.status === 'success') {
+        await api.copyFile(tempOut, workingPath);
+        await refreshActiveFileData();
+        showStatus('✓ Blank page inserted.');
+        if (autoSave) handleAction('save');
+      } else showStatus(`Error: ${result.message}`, true);
+    }
+
+    // Insert PDF File
+    else if (actionName === 'insert-file') {
+      const insertPath = await api.openFile();
+      if (!insertPath || insertPath.error) return;
+      showStatus('Inserting PDF file…');
+      const tempOut = await api.getTempPath('insert_file');
+      const result = await api.runPython('insert_file', ['--input', workingPath, '--output', tempOut, '--page', String(activeFile.currentPage), '--image', insertPath.path]);
+      if (result.status === 'success') {
+        await api.copyFile(tempOut, workingPath);
+        await refreshActiveFileData();
+        showStatus('✓ File inserted successfully.');
+        if (autoSave) handleAction('save');
+      } else showStatus(`Error: ${result.message}`, true);
+    }
+
+    // Duplicate Page
+    else if (actionName === 'duplicate-page') {
+      showStatus('Duplicating page…');
+      const tempOut = await api.getTempPath('dup');
+      const result = await api.runPython('duplicate_page', ['--input', workingPath, '--output', tempOut, '--page', String(activeFile.currentPage - 1)]);
+      if (result.status === 'success') {
+        await api.copyFile(tempOut, workingPath);
+        await refreshActiveFileData();
+        showStatus('✓ Page duplicated.');
+        if (autoSave) handleAction('save');
+      } else showStatus(`Error: ${result.message}`, true);
+    }
+
+    // Make Searchable (OCR)
+    else if (actionName === 'ocr-searchable') {
+      showStatus('Running OCR (this may take a while)…');
+      const tempOut = await api.getTempPath('ocr');
+      const result = await api.runPython('ocr_searchable', ['--input', workingPath, '--output', tempOut]);
+      if (result.status === 'success') {
+        await api.copyFile(tempOut, workingPath);
+        await refreshActiveFileData();
+        showStatus('✓ Document is now searchable.');
+        if (autoSave) handleAction('save');
+      } else showStatus(`OCR failed: ${result.message}`, true);
     }
 
     // Undo / Redo
@@ -543,7 +694,7 @@ function App() {
         .split('-')
         .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
         .join(' ');
-      showStatus(`Pipeline initiated for: ${prettyName} (UI active).`);
+      info('Coming Soon', `${prettyName} is currently under development.`);
     }
   };
 
@@ -1078,6 +1229,28 @@ function App() {
             )}
           </div>
         </div>
+      )}
+
+      {/* 5. Custom UI Overlays */}
+      {showPrintModal && (
+        <PrintModal 
+          activeFile={activeFile} 
+          onClose={() => setShowPrintModal(false)}
+          onPrint={async (settings) => {
+            showStatus('Sending to printer...');
+            const result = await window.electronAPI.printSilent(activeFile.workingPath, settings);
+            if (result.status === 'success') showStatus('✓ Document printed successfully.');
+            else showStatus(`Print failed: ${result.message}`, true);
+          }}
+        />
+      )}
+
+      {showRecentModal && (
+        <RecentFilesModal 
+          recentFiles={recentFiles}
+          onClose={() => setShowRecentModal(false)}
+          onOpenRecent={handleOpenSpecificFile}
+        />
       )}
     </div>
   );
