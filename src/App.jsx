@@ -3,9 +3,12 @@ import Ribbon from './components/Ribbon';
 import PDFViewer from './components/PDFViewer';
 import './App.css';
 
+// Import logo asset
+import logoImg from './assets/logo.png';
+
 function App() {
   // Tabs State (supports multiple files open at once)
-  const [openFiles, setOpenFiles] = useState([]); // { id, name, path, workingPath, data, currentPage, scale }
+  const [openFiles, setOpenFiles] = useState([]); // { id, name, path, workingPath, data, currentPage, scale, numPages }
   const [activeFileId, setActiveFileId] = useState(null);
 
   // Sidebar Toggles
@@ -48,7 +51,6 @@ function App() {
         e.preventDefault();
         if (activeFile) handleAction('save');
       } else if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-        // Triggers search panel
         e.preventDefault();
         setSidebarOpen(true);
         setSidebarActiveTab('search');
@@ -63,7 +65,8 @@ function App() {
     showStatus('Opening File dialog…');
     const result = await window.electronAPI.openFile();
     if (result && !result.error) {
-      const fileName = result.path.split('\\').pop();
+      // Robust split for both Unix and Windows slashes to display file name properly
+      const fileName = result.path.split(/[/\\]/).pop();
       const newFile = {
         id: `file_${Date.now()}`,
         name: fileName,
@@ -71,7 +74,8 @@ function App() {
         workingPath: result.workingPath,
         data: result.data,
         currentPage: 1,
-        scale: 1.3
+        scale: 1.3,
+        numPages: 0
       };
       setOpenFiles((prev) => [...prev, newFile]);
       setActiveFileId(newFile.id);
@@ -89,6 +93,11 @@ function App() {
       setActiveFileId(remain.length > 0 ? remain[remain.length - 1].id : null);
     }
     showStatus('Document closed.');
+  };
+
+  // Callback from PDFViewer when document loaded successfully
+  const handleDocumentLoad = (totalPages) => {
+    updateActiveFileProperty('numPages', totalPages);
   };
 
   // Refreshes the binary viewer data of the active file using its current workingPath
@@ -124,20 +133,19 @@ function App() {
       const result = await api.runPython('merge', ['--input', ...paths, '--output', savePath]);
       if (result.status === 'success') {
         showStatus('✓ Merged successfully!');
-        // Open the merged file instantly in a new tab!
         const fileResult = await api.openFile.__bypass?.(savePath) ?? await api.readFile(savePath);
         if (fileResult && !fileResult.error) {
-          // Setup a temporary working copy in scratch space for the new tab
           const tempPath = await api.getTempPath('merged');
           await api.copyFile(savePath, tempPath);
           const newFile = {
             id: `file_${Date.now()}`,
-            name: savePath.split('\\').pop(),
+            name: savePath.split(/[/\\]/).pop(),
             path: savePath,
             workingPath: tempPath,
             data: fileResult.data,
             currentPage: 1,
-            scale: 1.3
+            scale: 1.3,
+            numPages: 0
           };
           setOpenFiles((prev) => [...prev, newFile]);
           setActiveFileId(newFile.id);
@@ -152,8 +160,6 @@ function App() {
       const savePath = await api.saveFile('blank.pdf');
       if (!savePath) return;
       showStatus('Creating blank document…');
-      // Create empty document via python by saving a blank doc
-      // Python PyMuPDF can write fitz.open().save(path)
       const result = await api.runPython('save', ['--input', '', '--output', savePath]);
       if (result.status === 'success' || result.message?.includes('NoneType')) {
         showStatus('✓ Blank document created.');
@@ -168,7 +174,8 @@ function App() {
             workingPath: tempPath,
             data: fileResult.data,
             currentPage: 1,
-            scale: 1.3
+            scale: 1.3,
+            numPages: 0
           };
           setOpenFiles((prev) => [...prev, newFile]);
           setActiveFileId(newFile.id);
@@ -215,11 +222,10 @@ function App() {
       const copyResult = await api.copyFile(workingPath, savePath);
       if (copyResult.status === 'success') {
         showStatus('✓ Copy saved successfully!');
-        // Update active tab properties to reflect new save path
         setOpenFiles((prev) =>
           prev.map((f) =>
             f.id === activeFile.id
-              ? { ...f, path: savePath, name: savePath.split('\\').pop() }
+              ? { ...f, path: savePath, name: savePath.split(/[/\\]/).pop() }
               : f
           )
         );
@@ -524,7 +530,6 @@ function App() {
 
     // Other Phase Features (Mocks)
     else {
-      // General handler for features to show mock message
       const prettyName = actionName
         .split('-')
         .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
@@ -632,12 +637,15 @@ function App() {
     }, 1500);
   };
 
+  // Dynamic Page Count helper
+  const pageCount = activeFile?.numPages || 0;
+
   return (
     <div className="app-container">
       {/* 1. Custom Title Bar & Document Tabs */}
       <div className="title-bar">
         <div className="title-logo">
-          <span className="title-logo-icon">📄</span>
+          <img src={logoImg} className="title-logo-img" alt="PDF Master Logo" />
           <span>PDF Master 1.0</span>
         </div>
         <div className="doc-tabs-container">
@@ -647,8 +655,9 @@ function App() {
               className={`doc-tab ${file.id === activeFileId ? 'active' : ''}`}
               onClick={() => setActiveFileId(file.id)}
             >
-              <span>{file.name}</span>
-              <button className="doc-tab-close-btn" onClick={(e) => handleCloseFile(file.id, e)}>
+              {/* Wrapped text container for text-overflow ellipsis helper */}
+              <span className="doc-tab-name">{file.name}</span>
+              <button className="doc-tab-close-btn" onClick={(e) => handleCloseFile(file.id, e)} title="Close Tab">
                 ✕
               </button>
             </div>
@@ -669,7 +678,7 @@ function App() {
               if (sidebarOpen && sidebarActiveTab === 'pages') setSidebarOpen(false);
               else { setSidebarOpen(true); setSidebarActiveTab('pages'); }
             }}
-            title="Pages Thumbnail list"
+            title="Pages Outline list"
           >
             📖
           </button>
@@ -731,9 +740,9 @@ function App() {
               </button>
             </div>
             <div className="sidebar-drawer-content">
-              {sidebarActiveTab === 'pages' && (
+              {sidebarActiveTab === 'pages' && pageCount > 0 && (
                 <div className="thumbnail-list">
-                  {Array.from({ length: 4 }).map((_, i) => (
+                  {Array.from({ length: pageCount }).map((_, i) => (
                     <div
                       key={i}
                       className={`thumbnail-card ${activeFile.currentPage === i + 1 ? 'active' : ''}`}
@@ -745,11 +754,14 @@ function App() {
                   ))}
                 </div>
               )}
+              {sidebarActiveTab === 'pages' && pageCount === 0 && (
+                <p style={{ margin: 0, fontSize: '12px', color: '#6b7280' }}>Loading thumbnails…</p>
+              )}
               {sidebarActiveTab === 'bookmarks' && (
                 <div className="outline-list">
                   <div className="outline-item" onClick={() => updateActiveFileProperty('currentPage', 1)}>1. Document Overview</div>
-                  <div className="outline-item" onClick={() => updateActiveFileProperty('currentPage', 2)}>2. Technical Setup</div>
-                  <div className="outline-item" onClick={() => updateActiveFileProperty('currentPage', 3)}>3. Main Index</div>
+                  {pageCount >= 2 && <div className="outline-item" onClick={() => updateActiveFileProperty('currentPage', 2)}>2. Technical Setup</div>}
+                  {pageCount >= 3 && <div className="outline-item" onClick={() => updateActiveFileProperty('currentPage', 3)}>3. Main Index</div>}
                 </div>
               )}
               {sidebarActiveTab === 'search' && (
@@ -790,10 +802,11 @@ function App() {
               setCurrentPage={(val) => updateActiveFileProperty('currentPage', typeof val === 'function' ? val(activeFile.currentPage) : val)}
               singlePageMode={singlePageMode}
               darkMode={darkMode}
+              onDocumentLoad={handleDocumentLoad}
             />
           ) : (
             <div className="landing-grid">
-              <div className="landing-logo">📄</div>
+              <img src={logoImg} className="landing-logo-img" alt="PDF Master Logo" style={{ width: '96px', height: '96px' }} />
               <h1>Welcome to PDF Master</h1>
               <p>
                 Open a PDF document from your file system to view, edit, annotate, compress, password protect, or summarize it using our offline tools.

@@ -21,13 +21,15 @@ body {
 .title-bar {
   display: flex;
   align-items: center;
-  height: 48px;
+  height: 44px;
+  min-height: 44px;
   background-color: #121214;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  padding: 0 16px;
-  gap: 16px;
+  padding: 0 12px 0 16px;
+  gap: 12px;
   flex-shrink: 0;
   -webkit-app-region: drag;
+  overflow: hidden;
 }
 
 .title-logo {
@@ -35,24 +37,31 @@ body {
   align-items: center;
   gap: 8px;
   font-weight: 700;
-  font-size: 14px;
+  font-size: 13px;
   color: #4ecca0;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.title-logo-img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  border-radius: 4px;
   flex-shrink: 0;
 }
 
-.title-logo-icon {
-  font-size: 18px;
-}
-
+/* Tabs area fills remaining space */
 .doc-tabs-container {
   display: flex;
   align-items: flex-end;
-  gap: 4px;
+  gap: 3px;
   height: 100%;
-  overflow-x: auto;
   flex: 1;
-  padding-bottom: 0;
-  scrollbar-width: none; /* Hide scrollbar for clean tab look */
+  overflow-x: auto;
+  overflow-y: visible;
+  padding: 6px 0 0 0;
+  scrollbar-width: none;
   -webkit-app-region: no-drag;
 }
 
@@ -60,26 +69,27 @@ body {
   display: none;
 }
 
+/* Each tab: name truncates, close btn always stays visible */
 .doc-tab {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 14px;
+  gap: 6px;
+  padding: 0 10px 0 12px;
   background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   border-bottom: none;
-  border-top-left-radius: 8px;
-  border-top-right-radius: 8px;
+  border-top-left-radius: 7px;
+  border-top-right-radius: 7px;
   color: #8b8b92;
   font-size: 12px;
   cursor: pointer;
-  max-width: 180px;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  overflow: hidden;
-  transition: all 0.2s;
-  height: 28px;
+  /* Controlled width range */
+  min-width: 100px;
+  max-width: 200px;
+  height: 30px;
   box-sizing: border-box;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
 }
 
 .doc-tab:hover {
@@ -88,32 +98,51 @@ body {
 }
 
 .doc-tab.active {
-  background: #1e1e24;
-  border-color: rgba(255, 255, 255, 0.08);
+  background: #1c1c22;
+  border-color: rgba(255, 255, 255, 0.1);
   color: #fff;
   font-weight: 500;
   border-top: 2px solid #4ecca0;
-  height: 32px;
+  height: 34px;
 }
 
+/* Text label inside tab — this is what clips, NOT the outer tab */
+.doc-tab-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* Close button always stays at its natural size */
 .doc-tab-close-btn {
+  flex-shrink: 0;
   background: transparent;
   border: none;
-  color: #6b6b72;
+  color: transparent;
   cursor: pointer;
-  font-size: 11px;
+  font-size: 10px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
   padding: 0;
+  transition: background 0.15s, color 0.15s;
+  -webkit-app-region: no-drag;
+}
+
+/* Show close btn on hover of the parent tab */
+.doc-tab:hover .doc-tab-close-btn,
+.doc-tab.active .doc-tab-close-btn {
+  color: #9ca3af;
 }
 
 .doc-tab-close-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #ff6b6b;
+  background: rgba(255, 80, 80, 0.15);
+  color: #ff6b6b !important;
 }
 
 /* ── Workspace Sub-Layout ─────────────────────────────────────── */
@@ -226,6 +255,17 @@ body {
 .thumbnail-card:hover {
   border-color: rgba(78, 204, 160, 0.3);
   transform: translateY(-2px);
+}
+
+.thumbnail-card.active {
+  border-color: #4ecca0;
+  background: rgba(78, 204, 160, 0.06);
+  box-shadow: 0 0 0 1px rgba(78, 204, 160, 0.2);
+}
+
+.thumbnail-card.active .thumbnail-label {
+  color: #4ecca0;
+  font-weight: 600;
 }
 
 .thumbnail-preview {
@@ -708,6 +748,20 @@ body {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   filter: drop-shadow(0 4px 10px rgba(78,204,160,0.2));
+}
+
+/* Landing logo image replacement */
+.landing-logo-img {
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+  filter: drop-shadow(0 6px 18px rgba(78,204,160,0.25));
+  animation: logoFloat 3s ease-in-out infinite alternate;
+}
+
+@keyframes logoFloat {
+  from { transform: translateY(0); }
+  to { transform: translateY(-6px); }
 }
 
 .landing-grid h1 {

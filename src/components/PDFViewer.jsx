@@ -14,7 +14,8 @@ const PDFViewer = ({
   currentPage, 
   setCurrentPage, 
   singlePageMode = false, 
-  darkMode = false 
+  darkMode = false,
+  onDocumentLoad
 }) => {
   const containerRef = useRef(null);
   const [pdfDoc, setPdfDoc] = useState(null);
@@ -46,6 +47,11 @@ const PDFViewer = ({
         setNumPages(doc.numPages);
         setIsLoading(false);
         setCurrentPage(1);
+        
+        // Notify parent application of total pages
+        if (onDocumentLoad) {
+          onDocumentLoad(doc.numPages);
+        }
       })
       .catch((err) => {
         if (cancelled) return;
@@ -75,7 +81,6 @@ const PDFViewer = ({
       const startPage = singlePageMode ? currentPage : 1;
       const endPage = singlePageMode ? currentPage : pdfDoc.numPages;
 
-      // Bound page range just in case
       const actualStart = Math.max(1, Math.min(startPage, pdfDoc.numPages));
       const actualEnd = Math.max(1, Math.min(endPage, pdfDoc.numPages));
 
@@ -93,7 +98,6 @@ const PDFViewer = ({
           canvas.width = viewport.width;
           canvas.className = 'pdf-canvas';
           if (darkMode) {
-            // High fidelity PDF Inversion filter (retains images nicely using simple invert + rotate)
             canvas.style.filter = 'invert(0.9) hue-rotate(180deg)';
           }
 
@@ -123,7 +127,7 @@ const PDFViewer = ({
     renderPages();
   }, [pdfDoc, scale, singlePageMode, currentPage, darkMode]);
 
-  // Track visible page in continuous mode
+  // Track visible page in continuous mode (scrolling down updates active page count status)
   useEffect(() => {
     if (singlePageMode || !containerRef.current || numPages === 0) return;
 
@@ -149,6 +153,22 @@ const PDFViewer = ({
 
     return () => observer.disconnect();
   }, [numPages, scale, singlePageMode]);
+
+  // Scroll target page into view when currentPage changes from outside (e.g. sidebar thumbnails)
+  useEffect(() => {
+    if (singlePageMode || !containerRef.current || !pdfDoc) return;
+    const targetPageWrapper = containerRef.current.querySelector(`.pdf-page-wrapper[data-page="${currentPage}"]`);
+    if (targetPageWrapper) {
+      const rect = targetPageWrapper.getBoundingClientRect();
+      const parentRect = containerRef.current.parentElement.getBoundingClientRect();
+      
+      // Determine if target page is outside the visible stage window
+      const isOut = (rect.top < parentRect.top - 50 || rect.bottom > parentRect.bottom + 50);
+      if (isOut) {
+        targetPageWrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+  }, [currentPage, singlePageMode, pdfDoc]);
 
   const zoomIn = () => setScale((s) => Math.min(+(s + 0.15).toFixed(2), 3.0));
   const zoomOut = () => setScale((s) => Math.max(+(s - 0.15).toFixed(2), 0.5));
